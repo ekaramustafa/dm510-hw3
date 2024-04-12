@@ -41,5 +41,7 @@ int dm510fs_utime(const char * path, struct utimbuf *ubuf);
 int dm510fs_release(const char *path, struct fuse_file_info *fi);
 int dm510fs_rmdir(const char *path);
 int dm510fs_unlink(const char *path);
+int dm510fs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info * filp);
+int dm510fs_truncate(const char *path, off_t size);
 void* dm510fs_init();
 void dm510fs_destroy(void *private_data);

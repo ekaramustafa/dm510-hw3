@@ -14,11 +14,11 @@ static struct fuse_operations dm510fs_oper = {
 	.mkdir = dm510fs_mkdir,
 	.unlink = dm510fs_unlink,
 	.rmdir = dm510fs_rmdir,
-	.truncate = NULL,
+	.truncate = dm510fs_truncate,
 	.open	= dm510fs_open,
 	.read	= dm510fs_read,
 	.release = dm510fs_release,
-	.write = NULL,
+	.write = dm510fs_write,
 	.rename = dm510fs_rename,
 	.utime = dm510fs_utime,
 	.init = dm510fs_init,
@@ -93,7 +93,8 @@ int dm510fs_readdir( const char *path, void *buf, fuse_fill_dir_t filler, off_t 
 	(void) offset;
 	(void) fi;
 	printf("readdir: (path=%s)\n", path);
-	
+	filler(buf, ".", NULL, 0);
+	filler(buf, "..", NULL, 0);
 	for(int i =0;i<MAX_INODES;i++){
 		if(filesystem[i].is_active){
 			char *real_path = extract_path_from_abs(filesystem[i].path);
@@ -271,17 +272,55 @@ int dm510fs_rmdir(const char *path) {
     return -ENOENT; 
 }
 
+
+int dm510fs_truncate(const char *path, off_t size){
+    printf("truncate: (path=%s, size=%lld)\n", path, (long long)size);
+
+	for (int i = 0; i < MAX_INODES; i++) {
+        if (filesystem[i].is_active && strcmp(filesystem[i].path, path) == 0) {
+            filesystem[i].mtime = time(NULL);
+			filesystem[i].size = size;
+            return 0;
+        }
+    }
+
+
+	return -ENOENT;
+}
+
+int dm510fs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info * filp){
+	printf("write: (path=%s), (size=%lu), (offset=%ld) \n", path, size, offset);
+	for(int i =0;i< MAX_INODES;i++){
+		if(filesystem[i].is_active){
+			if(strcmp(filesystem[i].path, path) == 0){
+				if(offset + size > filesystem[i].size) {
+                // Adjust file size if necessary
+                filesystem[i].size = offset + size;
+            	}
+            	// Copy data to the file's data buffer at the specified offset
+            	memcpy(filesystem[i].data + offset, buf, size);
+            	filesystem[i].mtime = time(NULL); // Update modification time
+            	return size;
+			}
+		}
+	}
+
+	return -ENOENT;
+}
+
 /*
  * Read size bytes from the given file into the buffer buf, beginning offset bytes into the file. See read(2) for full details.
  * Returns the number of bytes transferred, or 0 if offset was at or beyond the end of the file. Required for any sensible filesystem.
 */
 int dm510fs_read( const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi ) {
     printf("read: (path=%s)\n", path);
+
 	for(int i =0; i< MAX_INODES;i++){
 
 		if(strcmp(filesystem[i].path, path) == 0){
 			printf("Read : path : %s at location %i\n", path, i);
 			memcpy(buf, filesystem[i].data, filesystem[i].size);
+			filesystem[i].atime = time(NULL);
 			return filesystem[i].size;
 		}
 
@@ -321,7 +360,7 @@ void* dm510fs_init() {
 	filesystem[0].nlink = 2;
 	filesystem[0].group = getgid();
 	filesystem[0].owner = getuid();
-	filesystem[0].size = 4096;
+	filesystem[0].size = 4096; //from an observation on my laptop
 	filesystem[0].atime = current_time;
 	filesystem[0].mtime = current_time;
 	memcpy(filesystem[0].path, "/", 2); 
