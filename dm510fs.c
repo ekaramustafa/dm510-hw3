@@ -12,7 +12,7 @@ static struct fuse_operations dm510fs_oper = {
 	.readdir	= dm510fs_readdir,
 	.mknod = dm510fs_mknod,
 	.mkdir = dm510fs_mkdir,
-	.unlink = NULL,
+	.unlink = dm510fs_unlink,
 	.rmdir = dm510fs_rmdir,
 	.truncate = NULL,
 	.open	= dm510fs_open,
@@ -49,7 +49,7 @@ int dm510fs_getattr( const char *path, struct stat *stbuf ) {
 	for(int i =0;i < MAX_INODES;i++){
 		if(filesystem[i].is_active){
 			if(strcmp(filesystem[i].path, path) == 0){
-				printf("Found inode for path %s, name %s at location %i ",path,filesystem[i].name,i);
+				printf("Found inode for path %s, name %s at location %i \n",path,filesystem[i].name,i);
 				stbuf->st_mode = filesystem[i].mode;
 				stbuf->st_nlink = filesystem[i].nlink;
 				stbuf->st_size = filesystem[i].size;
@@ -223,6 +223,20 @@ int dm510fs_utime(const char * path, struct utimbuf *ubuf){
 		}
 	}
 
+
+	return -ENOENT;
+}
+
+int dm510fs_unlink(const char *path){
+	printf("unlink : (path=%s)\n",path);
+	for(int i =0;i<MAX_INODES;i++){
+		if(filesystem[i].is_active){
+			if(strcmp(filesystem[i].path, path) == 0){
+				filesystem[i].is_active = false;
+				return 0;
+			}
+		}
+	}
 
 	return -ENOENT;
 }
