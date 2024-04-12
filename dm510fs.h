@@ -35,5 +35,6 @@ int dm510fs_mknod(const char *path, mode_t mode, dev_t devno);
 int dm510fs_rename(const char *path, const char *new_path);
 int dm510fs_utime(const char * path, struct utimbuf *ubuf);
 int dm510fs_release(const char *path, struct fuse_file_info *fi);
+int dm510fs_rmdir(const char *path);
 void* dm510fs_init();
 void dm510fs_destroy(void *private_data);

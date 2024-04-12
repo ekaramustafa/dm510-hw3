@@ -13,7 +13,7 @@ static struct fuse_operations dm510fs_oper = {
 	.mknod = dm510fs_mknod,
 	.mkdir = dm510fs_mkdir,
 	.unlink = NULL,
-	.rmdir = NULL,
+	.rmdir = dm510fs_rmdir,
 	.truncate = NULL,
 	.open	= dm510fs_open,
 	.read	= dm510fs_read,
@@ -161,6 +161,7 @@ int dm510fs_mknod(const char *path, mode_t mode, dev_t devno){
 	return -ENOENT;
 }
 
+// What about nested files??
 int dm510fs_rename(const char *path, const char *new_path){
 	printf("rename : (path=%s)\n",path);
 	for(int i=0;i< MAX_INODES;i++){
@@ -180,6 +181,9 @@ int dm510fs_utime(const char * path, struct utimbuf *ubuf){
 	printf("utime: (path=%s)\n",path);
 	for(int i =0;i < MAX_INODES;i++){
 		if(filesystem[i].is_active){
+			if(!filesystem[i].is_dir){
+				return -ENOTDIR;
+			}
 			if(strcmp(filesystem[i].path, path) == 0){
 				printf("Utime: path :%s at location %i\n",path,i);
 				filesystem[i].atime = ubuf->actime;
@@ -191,6 +195,24 @@ int dm510fs_utime(const char * path, struct utimbuf *ubuf){
 
 
 	return -ENOENT;
+}
+
+
+// TO-DO: Should I reset the all values? they will be overriden
+int dm510fs_rmdir(const char *path) {
+    printf("rmdir: (path=%s)\n", path);
+	int count = 0;
+    for (int i = 0; i < MAX_INODES; i++) {
+		//to check subfolders of directory use strncmp
+        if (filesystem[i].is_active && strncmp(filesystem[i].path, path, strlen(path)) == 0) {
+            filesystem[i].is_active = false;
+			count++;
+        }
+    }
+	if(count != 0){
+		return 0;
+	}
+    return -ENOENT; 
 }
 
 /*
