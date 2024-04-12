@@ -158,7 +158,7 @@ int dm510fs_mknod(const char *path, mode_t mode, dev_t devno){
 		}
 	}
 
-	return -EONENT;
+	return -ENOENT;
 }
 
 int dm510fs_rename(const char *path, const char *new_path){
