@@ -19,7 +19,7 @@ static struct fuse_operations dm510fs_oper = {
 	.read	= dm510fs_read,
 	.release = dm510fs_release,
 	.write = NULL,
-	.rename = NULL,
+	.rename = dm510fs_rename,
 	.utime = NULL,
 	.init = dm510fs_init,
 	.destroy = dm510fs_destroy
@@ -138,6 +138,7 @@ int dm510fs_mkdir(const char *path, mode_t mode) {
 	return 0;
 }
 
+//Does not work
 int dm510fs_mknod(const char *path, mode_t mode, dev_t devno){
 	printf("mknode: (path=%s)\n",path);
 	for( int i = 0; i < MAX_INODES; i++) {
@@ -152,12 +153,27 @@ int dm510fs_mknod(const char *path, mode_t mode, dev_t devno){
 			filesystem[i].size = 0;
 			char *name = extract_name_from_abs(path);
 			memcpy(filesystem[i].name, name, strlen(name) + 1);
-			memcpy(filesystem[i].path, modified_path, strlen(modified_path)+1); 			
+			memcpy(filesystem[i].path, path, strlen(path)+1); 			
 			break;
 		}
 	}
 
 	return 0;
+}
+
+int dm510fs_rename(const char *path, const char *new_path){
+	printf("rename : (path=%s)\n",path);
+	for(int i=0;i< MAX_INODES;i++){
+		if(filesystem[i].is_active){
+			if(strcmp(filesystem[i].path, path) == 0){
+				char *new_name = extract_name_from_abs(new_path);
+				memcpy(filesystem[i].name, new_name, strlen(new_name) + 1);
+				memcpy(filesystem[i].path, new_path, strlen(new_path) + 1);
+				return 0;
+			}
+		}
+	}
+	return -1;
 }
 
 /*
