@@ -20,7 +20,7 @@ static struct fuse_operations dm510fs_oper = {
 	.release = dm510fs_release,
 	.write = NULL,
 	.rename = dm510fs_rename,
-	.utime = NULL,
+	.utime = dm510fs_utime,
 	.init = dm510fs_init,
 	.destroy = dm510fs_destroy
 };
@@ -154,11 +154,11 @@ int dm510fs_mknod(const char *path, mode_t mode, dev_t devno){
 			char *name = extract_name_from_abs(path);
 			memcpy(filesystem[i].name, name, strlen(name) + 1);
 			memcpy(filesystem[i].path, path, strlen(path)+1); 			
-			break;
+			return 0;
 		}
 	}
 
-	return 0;
+	return -EONENT;
 }
 
 int dm510fs_rename(const char *path, const char *new_path){
@@ -173,7 +173,24 @@ int dm510fs_rename(const char *path, const char *new_path){
 			}
 		}
 	}
-	return -1;
+	return -ENOENT;
+}
+
+int dm510fs_utime(const char * path, struct utimbuf *ubuf){
+	printf("utime: (path=%s)\n",path);
+	for(int i =0;i < MAX_INODES;i++){
+		if(filesystem[i].is_active){
+			if(strcmp(filesystem[i].path, path) == 0){
+				printf("Utime: path :%s at location %i\n",path,i);
+				filesystem[i].atime = ubuf->actime;
+				filesystem[i].mtime = ubuf->modtime;
+				return 0;
+			}
+		}
+	}
+
+
+	return -ENOENT;
 }
 
 /*
