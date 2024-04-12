@@ -1,0 +1,11 @@
+{
+    "files.associations": {
+        "stdio.h": "c",
+        "dm510fs.h": "c",
+        "fuse.h": "c",
+        "errno.h": "c",
+        "string.h": "c",
+        "stdlib.h": "c",
+        "stdbool.h": "c"
+    }
+}

@@ -1,0 +1,35 @@
+#include <fuse.h>
+#include <errno.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+
+#define MAX_DATA_IN_FILE 256
+#define MAX_PATH_LENGTH 256
+#define MAX_NAME_LENGTH 256
+#define MAX_INODES 16
+
+typedef struct Inode
+{
+    bool is_active;
+    bool is_dir;
+    char data[MAX_DATA_IN_FILE];
+    char path[MAX_PATH_LENGTH];
+    char name[MAX_NAME_LENGTH];
+    mode_t mode;
+    nlink_t nlink;
+    off_t size;
+    dev_t devno;
+} Inode;
+
+
+int dm510fs_getattr( const char *, struct stat * );
+int dm510fs_readdir( const char *, void *, fuse_fill_dir_t, off_t, struct fuse_file_info * );
+int dm510fs_open( const char *, struct fuse_file_info * );
+int dm510fs_read( const char *, char *, size_t, off_t, struct fuse_file_info * );
+int dm510fs_mkdir(const char *path, mode_t mode);
+int dm510fs_mknod(const char *path, mode_t mode, dev_t devno);
+int dm510fs_release(const char *path, struct fuse_file_info *fi);
+void* dm510fs_init();
+void dm510fs_destroy(void *private_data);
