@@ -131,11 +131,11 @@ int dm510fs_mkdir(const char *path, mode_t mode) {
 			char *name = extract_name_from_abs(path);
 			memcpy(filesystem[i].name, name, strlen(name) + 1);
 			memcpy(filesystem[i].path, path, strlen(path) + 1); 			
-			break;
+			return 0;
 		}
 	}
 
-	return 0;
+	return -ENONET;
 }
 
 //Does not work
@@ -161,29 +161,59 @@ int dm510fs_mknod(const char *path, mode_t mode, dev_t devno){
 	return -ENOENT;
 }
 
-// What about nested files??
-int dm510fs_rename(const char *path, const char *new_path){
-	printf("rename : (path=%s)\n",path);
-	for(int i=0;i< MAX_INODES;i++){
-		if(filesystem[i].is_active){
-			if(strcmp(filesystem[i].path, path) == 0){
-				char *new_name = extract_name_from_abs(new_path);
-				memcpy(filesystem[i].name, new_name, strlen(new_name) + 1);
-				memcpy(filesystem[i].path, new_path, strlen(new_path) + 1);
-				return 0;
-			}
-		}
-	}
-	return -ENOENT;
+//TO-DO memory leaks and error handling
+int dm510fs_rename(const char *path, const char *new_path) {
+    printf("rename : (path=%s)\n", path);
+    int count = 0;
+    for (int i = 0; i < MAX_INODES; i++) {
+        if (filesystem[i].is_active) {
+            bool is_subfolder = strlen(filesystem[i].path) > strlen(path);
+            if (strncmp(filesystem[i].path, path, strlen(path)) == 0) {
+                char *new_name = extract_name_from_abs(new_path);
+                char *prev_name = extract_name_from_abs(path);
+                if (!is_subfolder) {
+                    strcpy(filesystem[i].name, new_name); // Use strcpy to copy the string
+					strcpy(filesystem[i].path, new_path); // Use strcpy to copy the string
+                } else {
+                    char result[strlen(filesystem[i].path) - strlen(prev_name) + strlen(new_name) + 1]; // Include space for '\0'
+                    int insertIndex = 0;
+                    const char delimiters[] = "/";
+                    strcpy(result, "/"); // Start with a leading '/'
+                    insertIndex++;
+                    char *token = strtok(filesystem[i].path, delimiters); // Initialize strtok with filesystem[i].path
+                    while (token != NULL) {
+                        if (strcmp(token, prev_name) == 0) { // Compare token with prev_name
+                            strcat(result, new_name); // ADd new_name to result
+                            insertIndex += strlen(new_name); 
+                        } else {
+                            strcat(result, token); // Add token to result
+                            insertIndex += strlen(token); // Update insertIndex
+                        }
+                        token = strtok(NULL, delimiters);
+                        if (token != NULL) {
+                            strcat(result, "/"); // Add '/' if token is not NULL
+                            insertIndex++;
+                        }
+                    }
+                    strcpy(filesystem[i].path, result); // Update filesystem[i].path with the new path
+					free(token);
+                }
+                count++;
+				free(new_name);
+				free(prev_name);
+            }
+        }
+    }
+    if (count > 0) {
+        return 0;
+    }
+    return -ENOENT;
 }
 
 int dm510fs_utime(const char * path, struct utimbuf *ubuf){
 	printf("utime: (path=%s)\n",path);
 	for(int i =0;i < MAX_INODES;i++){
 		if(filesystem[i].is_active){
-			if(!filesystem[i].is_dir){
-				return -ENOTDIR;
-			}
 			if(strcmp(filesystem[i].path, path) == 0){
 				printf("Utime: path :%s at location %i\n",path,i);
 				filesystem[i].atime = ubuf->actime;
