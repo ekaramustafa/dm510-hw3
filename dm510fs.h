@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <unistd.h>
+#include <time.h>
 
 #define MAX_DATA_IN_FILE 256
 #define MAX_PATH_LENGTH 256
@@ -23,6 +25,8 @@ typedef struct Inode
     dev_t devno;
     time_t atime; // access time
     time_t mtime; // modification time
+    uid_t owner;
+    gid_t group;
 } Inode;
 
 

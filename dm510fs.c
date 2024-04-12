@@ -54,6 +54,10 @@ int dm510fs_getattr( const char *path, struct stat *stbuf ) {
 				stbuf->st_nlink = filesystem[i].nlink;
 				stbuf->st_size = filesystem[i].size;
 				stbuf->st_dev = filesystem[i].devno;
+				stbuf->st_uid = filesystem[i].owner;
+				stbuf->st_gid = filesystem[i].group;
+				stbuf->st_atime = filesystem[i].atime;
+				stbuf->st_mtime = filesystem[i].mtime;
 				return 0;	
 			}
 		}
@@ -128,6 +132,12 @@ int dm510fs_mkdir(const char *path, mode_t mode) {
 			filesystem[i].is_dir = true;
 			filesystem[i].mode = S_IFDIR | 0755;
 			filesystem[i].nlink = 2;
+			filesystem[i].size = 4096;
+			filesystem[i].group = getgid();
+			filesystem[i].owner = getuid();
+			time_t current_time = time(NULL);
+			filesystem[i].atime = current_time;
+			filesystem[i].mtime = current_time;
 			char *name = extract_name_from_abs(path);
 			memcpy(filesystem[i].name, name, strlen(name) + 1);
 			memcpy(filesystem[i].path, path, strlen(path) + 1); 			
@@ -138,19 +148,22 @@ int dm510fs_mkdir(const char *path, mode_t mode) {
 	return -ENONET;
 }
 
-//Does not work
 int dm510fs_mknod(const char *path, mode_t mode, dev_t devno){
 	printf("mknode: (path=%s)\n",path);
 	for( int i = 0; i < MAX_INODES; i++) {
 		if( filesystem[i].is_active == false ) {
 			printf("mknod: Found unused inode for at location %i\n", i);
-			// Use that for the directory
 			filesystem[i].is_active = true;
 			filesystem[i].is_dir = false;
-			filesystem[i].mode = S_IFREG | 0666;
+			filesystem[i].mode = S_IFREG | 0777;
 			filesystem[i].nlink = 1;
 			filesystem[i].devno = devno; //device number by makedev
 			filesystem[i].size = 0;
+			filesystem[i].group = getgid();
+			filesystem[i].owner = getuid();
+			time_t current_time = time(NULL);
+			filesystem[i].atime = current_time;
+			filesystem[i].mtime = current_time;
 			char *name = extract_name_from_abs(path);
 			memcpy(filesystem[i].name, name, strlen(name) + 1);
 			memcpy(filesystem[i].path, path, strlen(path)+1); 			
@@ -215,14 +228,14 @@ int dm510fs_utime(const char * path, struct utimbuf *ubuf){
 	for(int i =0;i < MAX_INODES;i++){
 		if(filesystem[i].is_active){
 			if(strcmp(filesystem[i].path, path) == 0){
-				printf("Utime: path :%s at location %i\n",path,i);
+				printf("utime: path :%s at location %i\n",path,i);
 				filesystem[i].atime = ubuf->actime;
 				filesystem[i].mtime = ubuf->modtime;
+				printf("name : %s\n",filesystem[i].name);
 				return 0;
 			}
 		}
 	}
-
 
 	return -ENOENT;
 }
@@ -242,7 +255,6 @@ int dm510fs_unlink(const char *path){
 }
 
 
-// TO-DO: Should I reset the all values? they will be overriden
 int dm510fs_rmdir(const char *path) {
     printf("rmdir: (path=%s)\n", path);
 	int count = 0;
@@ -301,12 +313,17 @@ void* dm510fs_init() {
 	for( int i = 0; i < MAX_INODES; i++) {
 		filesystem[i].is_active = false;
 	}
-
+	time_t current_time = time(NULL);
 	// Add root inode 
 	filesystem[0].is_active = true;
 	filesystem[0].is_dir = true;
 	filesystem[0].mode = S_IFDIR | 0755;
 	filesystem[0].nlink = 2;
+	filesystem[0].group = getgid();
+	filesystem[0].owner = getuid();
+	filesystem[0].size = 4096;
+	filesystem[0].atime = current_time;
+	filesystem[0].mtime = current_time;
 	memcpy(filesystem[0].path, "/", 2); 
 
 	// Add inode for the hello file
@@ -315,6 +332,10 @@ void* dm510fs_init() {
 	filesystem[1].mode = S_IFREG | 0777;
 	filesystem[1].nlink = 1;
 	filesystem[1].size = 12;
+	filesystem[1].group = getgid();
+	filesystem[1].owner = getuid();
+	filesystem[1].atime = current_time;
+	filesystem[1].mtime = current_time;
 	memcpy(filesystem[1].path, "/hello", 7);
 	memcpy(filesystem[1].data, "Hello World!", 13);
 	memcpy(filesystem[1].name, "hello", 6);
