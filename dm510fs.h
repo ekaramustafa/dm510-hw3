@@ -11,6 +11,7 @@
 #define MAX_PATH_LENGTH 256
 #define MAX_NAME_LENGTH 256
 #define MAX_INODES 16
+#define PERSISENT_FILENAME "filesystem.dat"
 
 typedef struct Inode
 {
@@ -45,3 +46,7 @@ int dm510fs_write(const char *path, const char *buf, size_t size, off_t offset, 
 int dm510fs_truncate(const char *path, off_t size);
 void* dm510fs_init();
 void dm510fs_destroy(void *private_data);
+
+
+void save_filesystem(const char *filename);
+void restore_filesystem(const char *filename);

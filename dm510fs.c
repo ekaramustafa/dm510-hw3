@@ -337,6 +337,57 @@ int dm510fs_release(const char *path, struct fuse_file_info *fi) {
 	return 0;
 }
 
+
+void save_filesystem(const char *filename) {
+    FILE *file = fopen(filename, "wb");
+    if (file == NULL) {
+        perror("Error opening file for writing");
+        return;
+    }
+
+    // Write each active inode to the file
+    for (int i = 0; i < MAX_INODES; i++) {
+        if (filesystem[i].is_active) {
+            fwrite(&filesystem[i], sizeof(Inode), 1, file);
+        }
+    }
+
+    fclose(file);
+}
+
+void restore_filesystem(const char *filename) {
+    FILE *file = fopen(filename, "rb");
+    if (file == NULL) {
+        perror("Error opening file for reading");
+        return;
+    }
+
+    // Clear the existing filesystem
+    memset(filesystem, 0, sizeof(filesystem));
+
+    // Read each inode from the file and populate the filesystem array
+    Inode temp;
+    while (fread(&temp, sizeof(Inode), 1, file) == 1) {
+        int index = -1;
+        for (int i = 0; i < MAX_INODES; i++) {
+            if (!filesystem[i].is_active) {
+                index = i;
+                break;
+            }
+        }
+        if (index != -1) {
+            filesystem[index] = temp;
+        } else {
+            printf("Maximum number of inodes reached.\n");
+            break;
+        }
+    }
+
+    fclose(file);
+}
+
+
+
 /**
  * Initialize filesystem
  *
@@ -349,6 +400,8 @@ void* dm510fs_init() {
     printf("init filesystem\n");
 
 	// Loop through all inodes - set them inactive
+	restore_filesystem(PERSISENT_FILENAME);
+	/*
 	for( int i = 0; i < MAX_INODES; i++) {
 		filesystem[i].is_active = false;
 	}
@@ -378,7 +431,9 @@ void* dm510fs_init() {
 	memcpy(filesystem[1].path, "/hello", 7);
 	memcpy(filesystem[1].data, "Hello World!", 13);
 	memcpy(filesystem[1].name, "hello", 6);
+	*/
     return NULL;
+	
 }
 
 /**
@@ -386,7 +441,7 @@ void* dm510fs_init() {
  * Called on filesystem exit.
  */
 void dm510fs_destroy(void *private_data) {
-    printf("destroy filesystem\n");
+	save_filesystem(PERSISENT_FILENAME);
 }
 
 
