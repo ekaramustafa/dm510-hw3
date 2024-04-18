@@ -2,6 +2,7 @@
 #include "helper.c"
 
 Inode filesystem[MAX_INODES];
+int inode_count; //to track how many inodes created
 
 /*
  * See descriptions in fuse source code usually located in /usr/include/fuse/fuse.h
@@ -124,6 +125,28 @@ int dm510fs_open( const char *path, struct fuse_file_info *fi ) {
 
 int dm510fs_mkdir(const char *path, mode_t mode) {
 	printf("mkdir: (path=%s)\n", path);
+	
+	//Error handling
+	if(inode_count == MAX_INODES){
+		printf("Cannot create directory\n");
+		printf("The limit for number of files reached : %d == %ld \n",inode_count, MAX_INODES);
+		return -EDQUOT;
+	}
+	size_t path_length = strlen(path);
+	size_t name_length = strlen(extract_name_from_abs(path));
+	
+	if(path_length > MAX_PATH_LENGTH){
+		printf("Cannot create directory\n");
+		printf("The length of path exceeded the limit: %ld > %d \n",path_length, MAX_PATH_LENGTH); 
+		return -ENAMETOOLONG;
+	}
+	if(name_length > MAX_NAME_LENGTH){
+		printf("Cannot create directory\n");
+		printf("The length of filename exceeded the limit: %ld > %d \n",name_length, MAX_NAME_LENGTH); 
+		return -ENAMETOOLONG;
+	}
+
+	inode_count++;
 	// Locate the first unused Inode in the filesystem
 	for( int i = 0; i < MAX_INODES; i++) {
 		if( filesystem[i].is_active == false ) {
@@ -151,6 +174,29 @@ int dm510fs_mkdir(const char *path, mode_t mode) {
 
 int dm510fs_mknod(const char *path, mode_t mode, dev_t devno){
 	printf("mknode: (path=%s)\n",path);
+
+	//Error handling
+	if(inode_count == MAX_INODES){
+		printf("Cannot create file\n");
+		printf("The limit for number of files reached : %d == %ld \n",inode_count, MAX_INODES);
+		return -EDQUOT;
+	}
+	size_t path_length = strlen(path);
+	size_t name_length = strlen(extract_name_from_abs(path));
+	
+	if(path_length > MAX_PATH_LENGTH){
+		printf("Cannot create file\n");
+		printf("The length of path exceeded the limit: %ld > %d \n",path_length, MAX_PATH_LENGTH); 
+		return -ENAMETOOLONG;
+	}
+	if(name_length > MAX_NAME_LENGTH){
+		printf("Cannot create file\n");
+		printf("The length of filename exceeded the limit: %ld > %d \n",name_length, MAX_NAME_LENGTH); 
+		return -ENAMETOOLONG;
+	}
+
+	inode_count++;
+
 	for( int i = 0; i < MAX_INODES; i++) {
 		if( filesystem[i].is_active == false ) {
 			printf("mknod: Found unused inode for at location %i\n", i);
@@ -290,6 +336,14 @@ int dm510fs_truncate(const char *path, off_t size){
 
 int dm510fs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info * filp){
 	printf("write: (path=%s), (size=%lu), (offset=%ld) \n", path, size, offset);
+	
+	//Error handling
+	size_t data_length = strlen(buf);
+	if(data_length > MAX_DATA_IN_FILE){
+		printf("The size of data exceeded the limit: %ld > %d \n",data_length, MAX_DATA_IN_FILE); 
+		return -EMSGSIZE;
+	}
+
 	for(int i =0;i< MAX_INODES;i++){
 		if(filesystem[i].is_active){
 			if(strcmp(filesystem[i].path, path) == 0){
