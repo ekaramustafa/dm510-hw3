@@ -5,9 +5,6 @@ GREEN='\e[32m'
 RED='\e[31m'
 RESET_COLOR='\e[0m'
 
-# Change directory to ~/dm510fs-mountpoint/
-cd ~/dm510fs-mountpoint/
-
 expected_string="a" 
 
 ls_output=$(ls)
