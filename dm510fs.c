@@ -129,7 +129,7 @@ int dm510fs_mkdir(const char *path, mode_t mode) {
 	//Error handling
 	if(inode_count == MAX_INODES){
 		printf("Cannot create directory\n");
-		printf("The limit for number of files reached : %d == %ld \n",inode_count, MAX_INODES);
+		printf("The limit for number of files reached : %d == %d \n",inode_count, MAX_INODES);
 		return -EDQUOT;
 	}
 	size_t path_length = strlen(path);
@@ -178,7 +178,7 @@ int dm510fs_mknod(const char *path, mode_t mode, dev_t devno){
 	//Error handling
 	if(inode_count == MAX_INODES){
 		printf("Cannot create file\n");
-		printf("The limit for number of files reached : %d == %ld \n",inode_count, MAX_INODES);
+		printf("The limit for number of files reached : %d == %d \n",inode_count, MAX_INODES);
 		return -EDQUOT;
 	}
 	size_t path_length = strlen(path);
@@ -243,7 +243,7 @@ int dm510fs_rename(const char *path, const char *new_path) {
                     char *token = strtok(filesystem[i].path, delimiters); // Initialize strtok with filesystem[i].path
                     while (token != NULL) {
                         if (strcmp(token, prev_name) == 0) { // Compare token with prev_name
-                            strcat(result, new_name); // ADd new_name to result
+                            strcat(result, new_name); // Add new_name to result
                             insertIndex += strlen(new_name); 
                         } else {
                             strcat(result, token); // Add token to result
@@ -455,37 +455,7 @@ void* dm510fs_init() {
 
 	// Loop through all inodes - set them inactive
 	restore_filesystem(PERSISENT_FILENAME);
-	/*
-	for( int i = 0; i < MAX_INODES; i++) {
-		filesystem[i].is_active = false;
-	}
-	time_t current_time = time(NULL);
-	// Add root inode 
-	filesystem[0].is_active = true;
-	filesystem[0].is_dir = true;
-	filesystem[0].mode = S_IFDIR | 0755;
-	filesystem[0].nlink = 2;
-	filesystem[0].group = getgid();
-	filesystem[0].owner = getuid();
-	filesystem[0].size = 4096; //from an observation on my laptop
-	filesystem[0].atime = current_time;
-	filesystem[0].mtime = current_time;
-	memcpy(filesystem[0].path, "/", 2); 
 
-	// Add inode for the hello file
-	filesystem[1].is_active = true;
-	filesystem[1].is_dir = false;
-	filesystem[1].mode = S_IFREG | 0777;
-	filesystem[1].nlink = 1;
-	filesystem[1].size = 12;
-	filesystem[1].group = getgid();
-	filesystem[1].owner = getuid();
-	filesystem[1].atime = current_time;
-	filesystem[1].mtime = current_time;
-	memcpy(filesystem[1].path, "/hello", 7);
-	memcpy(filesystem[1].data, "Hello World!", 13);
-	memcpy(filesystem[1].name, "hello", 6);
-	*/
     return NULL;
 	
 }
