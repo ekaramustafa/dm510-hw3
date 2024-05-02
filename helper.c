@@ -35,8 +35,8 @@ char *extract_path_from_abs(const char *buf) {
 // Returns the index of the found path in the filesystem provided if this is active
 // Returns -1 if the file was not found or if it is not active (deleted)
 // fs -> filesystem
-int find_path_index(const Inode fs[], int fs_size, const char *path) {
-	for(int i = 0; i < fs_size; i++){
+int find_path_index(const Inode fs[], int fs_max_size, const char *path) {
+	for(int i = 0; i < fs_max_size; i++){
 		if(fs[i].is_active && strcmp(fs[i].path, path) == 0){
             return i;
         }
@@ -56,8 +56,9 @@ void create_root_inode(Inode fs[]){
 }
 
 // Restore the filesystem from a .dat file created from outside
+// Returns the number of inodes in the filesystem, -1 if error occurred
 // fs -> filesystem
-void restore_filesystem(const char *filename, Inode fs[], const int fs_max_size) {
+int restore_filesystem(const char *filename, Inode fs[], const int fs_max_size) {
     // Clear the existing filesystem
     memset(fs, 0, fs_max_size * sizeof(Inode));
 
@@ -69,25 +70,27 @@ void restore_filesystem(const char *filename, Inode fs[], const int fs_max_size)
         FILE *file = fopen(filename, "w");
         if(file == NULL) {
             perror("Error creating filesystem file");
-            return;
+            return -1;
         }
         fclose(file);
-        return;
+        return 1;
     }
 
     FILE *file = fopen(filename, "rb");
     if (file == NULL) {
         perror("Error opening file for reading");
-        return;
+        return -1;
     }
 
     // Read each inode from the file and populate the filesystem array
     Inode temp;
     int next_file_index = -1;
+    int inode_count = 0;
     while(fread(&temp, sizeof(Inode), 1, file) == 1) {
         next_file_index++;
         if(next_file_index < fs_max_size) {
             fs[next_file_index] = temp;
+            inode_count++;
         } else {
             printf("Max number of inodes reached.\n");
             break;
@@ -95,6 +98,7 @@ void restore_filesystem(const char *filename, Inode fs[], const int fs_max_size)
     }
 
     fclose(file);
+    return inode_count;
 }
 
 void save_filesystem(const char *filename, Inode fs[], const int fs_max_size) {

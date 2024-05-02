@@ -328,7 +328,6 @@ int dm510fs_rmdir(const char *path) {
 
     for (int i = 0; i < MAX_INODES; i++) {
 		//to check subfolders of directory use strncmp
-		// TODO: Check if this behaves correctly
 		// TODO: Decrease the number of inode_count
         if (filesystem[i].is_active && strncmp(filesystem[i].path, path, strlen(path)) == 0) {
             filesystem[i].is_active = false;
@@ -392,17 +391,27 @@ int dm510fs_write(const char *path, const char *buf, size_t size, off_t offset, 
 int dm510fs_read( const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi ) {
     printf("read: (path=%s)\n", path);
 
-	for(int i =0; i< MAX_INODES;i++){
-		if(strcmp(filesystem[i].path, path) == 0){
-			printf("Read path: %s at location %i\n", path, i);
-			// TODO: Check if the buffer can receive the size of the whole data of the file
-
-			memcpy(buf, filesystem[i].data, filesystem[i].size);
-			filesystem[i].access_time = time(NULL);
-			return filesystem[i].size;
+	int file_index = find_path_index(filesystem, MAX_INODES, path);
+	if(file_index >= 0) {
+		if(offset >= filesystem[file_index].size) {
+			return 0;
 		}
+
+		printf("Read path: %s at location %i\n", path, file_index);
+		// Check if buffer can have enough size for the file's data
+		off_t file_size = filesystem[file_index].size - offset;
+		char *buffer = malloc(file_size * sizeof(char));
+		if (buffer == NULL) {
+			printf("Buffer does not have enough size for the data of the file\n");
+			return -ENOBUFS;
+		}
+
+		memcpy(buf, filesystem[file_index].data + offset, file_size);
+		filesystem[file_index].access_time = time(NULL); // Update access time
+		return filesystem[file_index].size;
 	}
-	return 0;
+
+	return -ENOENT;
 }
 
 /*
@@ -424,7 +433,7 @@ int dm510fs_release(const char *path, struct fuse_file_info *fi) {
  */
 void* dm510fs_init() {
     printf("init filesystem\n");
-	restore_filesystem(PERSISENT_FILENAME, filesystem, MAX_INODES);
+	inode_count = restore_filesystem(PERSISENT_FILENAME, filesystem, MAX_INODES);
 
     return NULL;
 }
