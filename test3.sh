@@ -1,13 +1,16 @@
 #!/bin/bash
-# remove test
+
+# Test 3: Test the removal of all files
+
 # Define colors
 GREEN='\e[32m'
 RED='\e[31m'
 YELLOW='\e[33m'
 RESET_COLOR='\e[0m'
+
 echo "==================================================="
 rm -rf *
-touch k.txt
+touch test.txt
 mkdir p
 echo -e "Before removing ls command is executed"
 echo -e "${YELLOW}$(ls)${RESET_COLOR}"
@@ -20,6 +23,7 @@ if [ "$(ls -A)" ]; then
     # Check if files are removed successfully
     if [ "$(ls -A)" ]; then
         echo -e "${RED}Failed to remove all files.${RESET_COLOR}"
+        echo -e "${GREEN}Test 3 Failed${RESET_COLOR}"
     else
         echo -e "${GREEN}All files removed successfully.${RESET_COLOR}"
         echo -e "After removing ls command is executed"

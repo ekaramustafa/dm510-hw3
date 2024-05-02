@@ -24,8 +24,8 @@ typedef struct Inode
     nlink_t nlink;
     off_t size;
     dev_t devno;
-    time_t atime; // access time
-    time_t mtime; // modification time
+    time_t access_time; // access time
+    time_t modif_time; // modification time
     uid_t owner;
     gid_t group;
 } Inode;
@@ -48,5 +48,5 @@ void* dm510fs_init();
 void dm510fs_destroy(void *private_data);
 
 
-void save_filesystem(const char *filename);
-void restore_filesystem(const char *filename);
+//  void save_filesystem(const char *filename);
+// void restore_filesystem(const char *filename, Inode fs[], const int fs_max_size);

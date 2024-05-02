@@ -1,3 +1,7 @@
+#!/bin/bash
+
+# Test 2: Test the creation of a file with 'touch' command
+
 # Define colors
 GREEN='\e[32m'
 RED='\e[31m'

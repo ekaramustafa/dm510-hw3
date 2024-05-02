@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Test 1: Test reading the current directory with 'ls' command
+
 # Define colors
 GREEN='\e[32m'
 RED='\e[31m'
