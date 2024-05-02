@@ -94,11 +94,12 @@ int dm510fs_readdir( const char *path, void *buf, fuse_fill_dir_t filler, off_t 
 	filler(buf, "..", NULL, 0);
 
 	for(int i = 0; i < MAX_INODES; i++){
-		if(filesystem[i].is_active){
+		// Check that it is active and not the exact same path
+		if(filesystem[i].is_active && strcmp(filesystem[i].path, path) != 0){
+			// Check if the inode is in the same directory path
 			char *real_path = extract_path_from_abs(filesystem[i].path);
 			printf("real_path: %s\n", real_path);
-			// Check if it is in the same directory path, but not being the same
-			if(strcmp(path, real_path) == 0 && strcmp(filesystem[i].path, path) != 0)
+			if(strcmp(path, real_path) == 0)
 				filler(buf, filesystem[i].name, NULL, 0);
 		}
 	}
@@ -115,7 +116,7 @@ int dm510fs_readdir( const char *path, void *buf, fuse_fill_dir_t filler, off_t 
 */
 int dm510fs_open( const char *path, struct fuse_file_info *fi ) {
     printf("open: (path=%s)\n", path);
-	// TODO: Check for the owner or group of the person calling it and put an error if it does not have permission
+
 	int index = find_active_path_index(filesystem, MAX_INODES, path);
 	if(index < 0) return -ENOENT;
 	
@@ -126,7 +127,7 @@ int dm510fs_open( const char *path, struct fuse_file_info *fi ) {
  * Create a new directory
 */
 int dm510fs_mkdir(const char *path, mode_t mode) {
-	printf("mkdir: (path=%s)\n", path);
+	printf("mkdir: (path=%s) (mode=%hu)\n", path, mode);
 
 	int error = handle_inode_creation(filesystem, MAX_INODES, path, inode_count);
 	if(error != 0) return error;
@@ -135,27 +136,27 @@ int dm510fs_mkdir(const char *path, mode_t mode) {
 	int free_index = find_inactive_index(filesystem, MAX_INODES, path);
 	if(free_index < 0) return -ENOSPC;
 
-	printf("mkdir: Found unused inode for at location %i\n", free_index);
-	filesystem[free_index].is_active = true;
-	filesystem[free_index].is_dir = true;
-	filesystem[free_index].mode = S_IFDIR | 0755; // TODO: Check this
-	filesystem[free_index].nlink = 2;
-	filesystem[free_index].size = 4096;
-	filesystem[free_index].group = getgid();
-	filesystem[free_index].owner = getuid();
-	filesystem[free_index].access_time = time(NULL);
-	filesystem[free_index].modif_time = time(NULL);
+	Inode *inode = &filesystem[free_index];
+	inode->is_active = true;
+	inode->is_dir = true;
+	inode->mode = S_IFDIR | mode;
+	inode->nlink = 2;
+	inode->size = 4096;
+	inode->group = getgid();
+	inode->owner = getuid();
+	inode->access_time = time(NULL);
+	inode->modif_time = time(NULL);
 
 	char *name = extract_name_from_abs(path);
-	memcpy(filesystem[free_index].name, name, strlen(name) + 1);
-	memcpy(filesystem[free_index].path, path, strlen(path) + 1); 			
+	memcpy(inode->name, name, strlen(name) + 1);
+	memcpy(inode->path, path, strlen(path) + 1); 			
 	inode_count++;
 
 	return 0;
 }
 
 int dm510fs_mknod(const char *path, mode_t mode, dev_t devno){
-	printf("mknode: (path=%s)\n",path);
+	printf("mknod: (path=%s) (mode=%hu)\n", path, mode);
 
 	int error = handle_inode_creation(filesystem, MAX_INODES, path, inode_count);
 	if(error != 0) return error;
@@ -164,21 +165,21 @@ int dm510fs_mknod(const char *path, mode_t mode, dev_t devno){
 	int free_index = find_inactive_index(filesystem, MAX_INODES, path);
 	if(free_index < 0) return -ENOSPC;
 
-	printf("mknod: Found unused inode for at location %i\n", free_index);
-	filesystem[free_index].is_active = true;
-	filesystem[free_index].is_dir = false;
-	filesystem[free_index].mode = S_IFREG | 0777; // TODO: Check this
-	filesystem[free_index].nlink = 1;
-	filesystem[free_index].devno = devno; //device number by makedev
-	filesystem[free_index].size = 0;
-	filesystem[free_index].group = getgid();
-	filesystem[free_index].owner = getuid();
-	filesystem[free_index].access_time = time(NULL);
-	filesystem[free_index].modif_time = time(NULL);
+	Inode *inode = &filesystem[free_index];
+	inode->is_active = true;
+	inode->is_dir = false;
+	inode->mode = mode;
+	inode->nlink = 1;
+	inode->devno = devno; //device number by makedev
+	inode->size = 0;
+	inode->group = getgid();
+	inode->owner = getuid();
+	inode->access_time = time(NULL);
+	inode->modif_time = time(NULL);
 
 	char *name = extract_name_from_abs(path);
-	memcpy(filesystem[free_index].name, name, strlen(name) + 1);
-	memcpy(filesystem[free_index].path, path, strlen(path) + 1);
+	memcpy(inode->name, name, strlen(name) + 1);
+	memcpy(inode->path, path, strlen(path) + 1);
 	inode_count++;
 
 	return 0;
