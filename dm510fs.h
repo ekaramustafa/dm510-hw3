@@ -30,7 +30,6 @@ typedef struct Inode
     gid_t group;
 } Inode;
 
-
 int dm510fs_getattr( const char *, struct stat * );
 int dm510fs_readdir( const char *, void *, fuse_fill_dir_t, off_t, struct fuse_file_info * );
 int dm510fs_open( const char *, struct fuse_file_info * );
@@ -46,7 +45,3 @@ int dm510fs_write(const char *path, const char *buf, size_t size, off_t offset, 
 int dm510fs_truncate(const char *path, off_t size);
 void* dm510fs_init();
 void dm510fs_destroy(void *private_data);
-
-
-//  void save_filesystem(const char *filename);
-// void restore_filesystem(const char *filename, Inode fs[], const int fs_max_size);

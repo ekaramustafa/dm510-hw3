@@ -44,23 +44,20 @@ int dm510fs_getattr( const char *path, struct stat *stbuf ) {
         return 0;
     }
 
-	int file_index = find_path_index(filesystem, MAX_INODES, path);
-	if(file_index >= 0) {
-		printf("Found inode for path %s, name %s at location %i \n", path, filesystem[file_index].name, file_index);
+	int index = find_active_path_index(filesystem, MAX_INODES, path);
+	if(index < 0) return -ENOENT;
 
-		stbuf->st_mode = filesystem[file_index].mode;
-		stbuf->st_nlink = filesystem[file_index].nlink;
-		stbuf->st_size = filesystem[file_index].size;
-		stbuf->st_dev = filesystem[file_index].devno;
-		stbuf->st_uid = filesystem[file_index].owner;
-		stbuf->st_gid = filesystem[file_index].group;
-		stbuf->st_atime = filesystem[file_index].access_time;
-		stbuf->st_mtime = filesystem[file_index].modif_time;
+	printf("Found inode for path %s, name %s at location %i \n", path, filesystem[index].name, index);
+	stbuf->st_mode = filesystem[index].mode;
+	stbuf->st_nlink = filesystem[index].nlink;
+	stbuf->st_size = filesystem[index].size;
+	stbuf->st_dev = filesystem[index].devno;
+	stbuf->st_uid = filesystem[index].owner;
+	stbuf->st_gid = filesystem[index].group;
+	stbuf->st_atime = filesystem[index].access_time;
+	stbuf->st_mtime = filesystem[index].modif_time;
 
-		return 0;
-	}
-
-	return -ENOENT;
+	return 0;
 }
 
 /*
@@ -90,10 +87,8 @@ int dm510fs_readdir( const char *path, void *buf, fuse_fill_dir_t filler, off_t 
 	printf("readdir: (path=%s)\n", path);
 
 	// Check if the directory path exists
-	if(find_path_index(filesystem, MAX_INODES, path) < 0) {
-		printf("Did not find %s\n", path);
+	if(find_active_path_index(filesystem, MAX_INODES, path) < 0)
 		return -ENOENT;
-	}
 
 	filler(buf, ".", NULL, 0);
 	filler(buf, "..", NULL, 0);
@@ -103,9 +98,9 @@ int dm510fs_readdir( const char *path, void *buf, fuse_fill_dir_t filler, off_t 
 			char *real_path = extract_path_from_abs(filesystem[i].path);
 			printf("real_path: %s\n", real_path);
 			if(strcmp(path, real_path) == 0){
-				if(strlen(filesystem[i].name) != 0){ // TODO: Why is this checked?
-					filler(buf, filesystem[i].name, NULL, 0);
-				}		
+				// if(strlen(filesystem[i].name) != 0){ // TODO: Why is this checked?
+				filler(buf, filesystem[i].name, NULL, 0);
+				//}		
 			}
 		}
 	}
@@ -122,10 +117,10 @@ int dm510fs_readdir( const char *path, void *buf, fuse_fill_dir_t filler, off_t 
 */
 int dm510fs_open( const char *path, struct fuse_file_info *fi ) {
     printf("open: (path=%s)\n", path);
-	int file_index = find_path_index(filesystem, MAX_INODES, path);
-	if(file_index < 0) {
-		return -ENOENT;
-	}
+	// TODO: Check for the owner or group of the person calling it and put an error if it does not have permission
+	int index = find_active_path_index(filesystem, MAX_INODES, path);
+	if(index < 0) return -ENOENT;
+		
 	return 0;
 }
 
@@ -135,108 +130,60 @@ int dm510fs_open( const char *path, struct fuse_file_info *fi ) {
 int dm510fs_mkdir(const char *path, mode_t mode) {
 	printf("mkdir: (path=%s)\n", path);
 
-	// Check if the path already exists
-	if(find_path_index(filesystem, MAX_INODES, path) < 0) {
-		return -EEXIST;
-	}
-	
-	// Check if the number of nodes is not exceeded
-	if(inode_count >= MAX_INODES){
-		printf("Cannot create directory\n");
-		printf("The limit for number of files reached : %d == %d\n", inode_count, MAX_INODES);
-		return -EDQUOT;
-	}
+	int error = handle_inode_creation(filesystem, MAX_INODES, path, inode_count);
+	if(error != 0) return error;
 
-	size_t path_length = strlen(path);
-	size_t name_length = strlen(extract_name_from_abs(path));
-	
-	if(path_length > MAX_PATH_LENGTH){
-		printf("Cannot create directory\n");
-		printf("The length of path exceeded the limit: %ld > %d \n", path_length, MAX_PATH_LENGTH); 
-		return -ENAMETOOLONG;
-	}
-
-	if(name_length > MAX_NAME_LENGTH){
-		printf("Cannot create directory\n");
-		printf("The length of filename exceeded the limit: %ld > %d \n", name_length, MAX_NAME_LENGTH); 
-		return -ENAMETOOLONG;
-	}
-
-	inode_count++;
 	// Locate the first unused Inode in the filesystem
-	for( int i = 0; i < MAX_INODES; i++) {
-		if( filesystem[i].is_active == false ) {
-			printf("mkdir: Found unused inode for at location %i\n", i);
+	int free_index = find_inactive_index(filesystem, MAX_INODES, path);
+	if(free_index < 0) return -ENOSPC;
 
-			// Use that for the directory
-			filesystem[i].is_active = true;
-			filesystem[i].is_dir = true;
-			filesystem[i].mode = S_IFDIR | 0755;
-			filesystem[i].nlink = 2;
-			filesystem[i].size = 4096;
-			filesystem[i].group = getgid();
-			filesystem[i].owner = getuid();
-			time_t current_time = time(NULL);
-			filesystem[i].access_time = current_time;
-			filesystem[i].modif_time = current_time;
+	printf("mkdir: Found unused inode for at location %i\n", free_index);
+	filesystem[free_index].is_active = true;
+	filesystem[free_index].is_dir = true;
+	filesystem[free_index].mode = S_IFDIR | 0755; // TODO: Check this
+	filesystem[free_index].nlink = 2;
+	filesystem[free_index].size = 4096;
+	filesystem[free_index].group = getgid();
+	filesystem[free_index].owner = getuid();
+	filesystem[free_index].access_time = time(NULL);
+	filesystem[free_index].modif_time = time(NULL);
 
-			char *name = extract_name_from_abs(path);
-			memcpy(filesystem[i].name, name, strlen(name) + 1);
-			memcpy(filesystem[i].path, path, strlen(path) + 1); 			
-			return 0;
-		}
-	}
+	char *name = extract_name_from_abs(path);
+	memcpy(filesystem[free_index].name, name, strlen(name) + 1);
+	memcpy(filesystem[free_index].path, path, strlen(path) + 1); 			
+	inode_count++;
 
-	return -ENOENT;
+	return 0;
 }
 
 int dm510fs_mknod(const char *path, mode_t mode, dev_t devno){
 	printf("mknode: (path=%s)\n",path);
 
-	//Error handling
-	if(inode_count == MAX_INODES){
-		printf("Cannot create file\n");
-		printf("The limit for number of files reached : %d == %d \n",inode_count, MAX_INODES);
-		return -EDQUOT;
-	}
-	size_t path_length = strlen(path);
-	size_t name_length = strlen(extract_name_from_abs(path));
-	
-	if(path_length > MAX_PATH_LENGTH){
-		printf("Cannot create file\n");
-		printf("The length of path exceeded the limit: %ld > %d \n",path_length, MAX_PATH_LENGTH); 
-		return -ENAMETOOLONG;
-	}
-	if(name_length > MAX_NAME_LENGTH){
-		printf("Cannot create file\n");
-		printf("The length of filename exceeded the limit: %ld > %d \n",name_length, MAX_NAME_LENGTH); 
-		return -ENAMETOOLONG;
-	}
+	int error = handle_inode_creation(filesystem, MAX_INODES, path, inode_count);
+	if(error != 0) return error;
 
+	// Locate the first unused Inode in the filesystem
+	int free_index = find_inactive_index(filesystem, MAX_INODES, path);
+	if(free_index < 0) return -ENOSPC;
+
+	printf("mknod: Found unused inode for at location %i\n", free_index);
+	filesystem[free_index].is_active = true;
+	filesystem[free_index].is_dir = false;
+	filesystem[free_index].mode = S_IFREG | 0777; // TODO: Check this
+	filesystem[free_index].nlink = 1;
+	filesystem[free_index].devno = devno; //device number by makedev
+	filesystem[free_index].size = 0;
+	filesystem[free_index].group = getgid();
+	filesystem[free_index].owner = getuid();
+	filesystem[free_index].access_time = time(NULL);
+	filesystem[free_index].modif_time = time(NULL);
+
+	char *name = extract_name_from_abs(path);
+	memcpy(filesystem[free_index].name, name, strlen(name) + 1);
+	memcpy(filesystem[free_index].path, path, strlen(path) + 1);
 	inode_count++;
 
-	for( int i = 0; i < MAX_INODES; i++) {
-		if( filesystem[i].is_active == false ) {
-			printf("mknod: Found unused inode for at location %i\n", i);
-			filesystem[i].is_active = true;
-			filesystem[i].is_dir = false;
-			filesystem[i].mode = S_IFREG | 0777;
-			filesystem[i].nlink = 1;
-			filesystem[i].devno = devno; //device number by makedev
-			filesystem[i].size = 0;
-			filesystem[i].group = getgid();
-			filesystem[i].owner = getuid();
-			time_t current_time = time(NULL);
-			filesystem[i].access_time = current_time;
-			filesystem[i].modif_time = current_time;
-			char *name = extract_name_from_abs(path);
-			memcpy(filesystem[i].name, name, strlen(name) + 1);
-			memcpy(filesystem[i].path, path, strlen(path)+1); 			
-			return 0;
-		}
-	}
-
-	return -ENOENT;
+	return 0;
 }
 
 //TO-DO memory leaks and error handling
@@ -290,36 +237,25 @@ int dm510fs_mknod(const char *path, mode_t mode, dev_t devno){
 
 int dm510fs_utime(const char * path, struct utimbuf *ubuf){
 	printf("utime: (path=%s)\n",path);
+	
+	int index = find_active_path_index(filesystem, MAX_INODES, path);
+	if(index < 0) return -ENOENT;
 
-	for(int i =0;i < MAX_INODES;i++){
-		if(filesystem[i].is_active){
-			if(strcmp(filesystem[i].path, path) == 0){
-				printf("utime: path :%s at location %i\n",path,i);
-				filesystem[i].access_time = ubuf->actime;
-				filesystem[i].modif_time = ubuf->modtime;
-				printf("name : %s\n",filesystem[i].name);
-				return 0;
-			}
-		}
-	}
-
-	return -ENOENT;
+	printf("utime: path:%s at location %i\n", path, index);
+	filesystem[index].access_time = ubuf->actime;
+	filesystem[index].modif_time = ubuf->modtime;
+	return 0;
 }
 
 int dm510fs_unlink(const char *path){
 	printf("unlink : (path=%s)\n",path);
 
-	// TODO: Decrease the number of inode_count
-	for(int i = 0; i < MAX_INODES; i++){
-		if(filesystem[i].is_active){
-			if(strcmp(filesystem[i].path, path) == 0){
-				filesystem[i].is_active = false;
-				return 0;
-			}
-		}
-	}
+	int index = find_active_path_index(filesystem, MAX_INODES, path);
+	if(index < 0) return -ENOENT;
 
-	return -ENOENT;
+	filesystem[index].is_active = false;
+	inode_count--;
+	return 0;
 }
 
 int dm510fs_rmdir(const char *path) {
@@ -327,17 +263,16 @@ int dm510fs_rmdir(const char *path) {
 	int count = 0;
 
     for (int i = 0; i < MAX_INODES; i++) {
-		//to check subfolders of directory use strncmp
-		// TODO: Decrease the number of inode_count
-        if (filesystem[i].is_active && strncmp(filesystem[i].path, path, strlen(path)) == 0) {
+		// To check for inodes inside of the directory use strncmp
+		bool path_in_directory = strncmp(filesystem[i].path, path, strlen(path)) == 0;
+        if (filesystem[i].is_active && path_in_directory) {
             filesystem[i].is_active = false;
 			count++;
+			inode_count--;
         }
     }
 
-	if(count != 0){
-		return 0;
-	}
+	if(count != 0) return 0;
 
     return -ENOENT; 
 }
@@ -345,43 +280,37 @@ int dm510fs_rmdir(const char *path) {
 int dm510fs_truncate(const char *path, off_t size){
     printf("truncate: (path=%s, size=%lld)\n", path, (long long)size);
 
-	for (int i = 0; i < MAX_INODES; i++) {
-        if (filesystem[i].is_active && strcmp(filesystem[i].path, path) == 0) {
-            filesystem[i].modif_time = time(NULL);
-			filesystem[i].size = size;
-            return 0;
-        }
-    }
+	int index = find_active_path_index(filesystem, MAX_INODES, path);
+	if(index >= 0) {
+		filesystem[index].modif_time = time(NULL);
+		filesystem[index].size = size;
+		return 0;
+	}
 
 	return -ENOENT;
 }
 
+/* 
+ * Write to a file in the filesystem if it is active and has space for the buffer and offset given
+*/
 int dm510fs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info * filp){
 	printf("write: (path=%s), (size=%lu), (offset=%ld) \n", path, size, offset);
 	
-	//Error handling
-	size_t data_length = strlen(buf);
-	if(data_length > MAX_DATA_IN_FILE){
-		printf("The size of data exceeded the limit: %ld > %d \n",data_length, MAX_DATA_IN_FILE); 
+	// Check if the offset plus the size of the buffer does not surpass the max limit
+	if(offset + size >= MAX_DATA_IN_FILE){
+		printf("The size of data exceeded the limit: %ld > %d \n", size + offset, MAX_DATA_IN_FILE); 
 		return -EMSGSIZE;
 	}
 
-	for(int i = 0; i < MAX_INODES; i++){
-		if(filesystem[i].is_active && strcmp(filesystem[i].path, path) == 0){
-			// TODO: What happens if a the size of the buffer is less than the max data in file but with the offset
-			// it surpasses it?
-			// TODO: What happens if the data is overwritten to the same file? The size does not decrease
-			if(offset + size > filesystem[i].size) { // Adjust file size if necessary
-				filesystem[i].size = offset + size;
-			}
-			// Copy data to the file's data buffer at the specified offset
-			memcpy(filesystem[i].data + offset, buf, size);
-			filesystem[i].modif_time = time(NULL); // Update modification time
-			return size;
-		}
-	}
+	int index = find_active_path_index(filesystem, MAX_INODES, path);
+	if(index < 0) return -ENOENT;
 
-	return -ENOENT;
+	if(filesystem[index].size < offset + size) // Adjust the size if it increases
+		filesystem[index].size = offset + size;
+
+	memcpy(filesystem[index].data + offset, buf, size);
+	filesystem[index].modif_time = time(NULL); // Update modification time
+	return size;
 }
 
 /*
@@ -389,29 +318,24 @@ int dm510fs_write(const char *path, const char *buf, size_t size, off_t offset, 
  * Returns the number of bytes transferred, or 0 if offset was at or beyond the end of the file. Required for any sensible filesystem.
 */
 int dm510fs_read( const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi ) {
-    printf("read: (path=%s)\n", path);
+	printf("read: (path=%s), (size=%lu), (offset=%ld) \n", path, size, offset);
 
-	int file_index = find_path_index(filesystem, MAX_INODES, path);
-	if(file_index >= 0) {
-		if(offset >= filesystem[file_index].size) {
-			return 0;
-		}
+	int index = find_active_path_index(filesystem, MAX_INODES, path);
+	if(index < 0) return -ENOENT;
 
-		printf("Read path: %s at location %i\n", path, file_index);
-		// Check if buffer can have enough size for the file's data
-		off_t file_size = filesystem[file_index].size - offset;
-		char *buffer = malloc(file_size * sizeof(char));
-		if (buffer == NULL) {
-			printf("Buffer does not have enough size for the data of the file\n");
-			return -ENOBUFS;
-		}
+	if(offset >= filesystem[index].size) return 0;
 
-		memcpy(buf, filesystem[file_index].data + offset, file_size);
-		filesystem[file_index].access_time = time(NULL); // Update access time
-		return filesystem[file_index].size;
-	}
+	printf("Read path: %s at location %i\n", path, index);
+	// Check if buffer has enough size to receive the data from the offset
+	off_t file_size = filesystem[index].size - offset;	
+	if(size < file_size) {
+		printf("Buffer does not have enough size for the data of the file\n");
+		return -ENOBUFS;
+	} 
 
-	return -ENOENT;
+	memcpy(buf, filesystem[index].data + offset, file_size);
+	filesystem[index].access_time = time(NULL); // Update access time
+	return filesystem[index].size;
 }
 
 /*

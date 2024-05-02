@@ -35,9 +35,53 @@ char *extract_path_from_abs(const char *buf) {
 // Returns the index of the found path in the filesystem provided if this is active
 // Returns -1 if the file was not found or if it is not active (deleted)
 // fs -> filesystem
-int find_path_index(const Inode fs[], int fs_max_size, const char *path) {
+int find_active_path_index(const Inode fs[], const int fs_max_size, const char *path) {
 	for(int i = 0; i < fs_max_size; i++){
 		if(fs[i].is_active && strcmp(fs[i].path, path) == 0){
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+// Handle error cases for the creation of an inode
+int handle_inode_creation(const Inode fs[], const int fs_max_size, const char *path, const int inode_count) {
+    // Check if the path already exists
+	if(find_active_path_index(filesystem, fs_max_size, path) >= 0) 
+		return -EEXIST;
+	
+	// Check if the number of inodes is not exceeded
+	if(inode_count >= fs_max_size){
+		printf("Cannot create directory\n");
+		printf("The limit for number of files reached : %d == %d\n", inode_count, fs_max_size);
+		return -ENOSPC;
+	}
+
+	size_t path_length = strlen(path);
+	size_t name_length = strlen(extract_name_from_abs(path));
+	
+	if(path_length > MAX_PATH_LENGTH){
+		printf("Cannot create directory\n");
+		printf("The length of path exceeded the limit: %ld > %d \n", path_length, MAX_PATH_LENGTH); 
+		return -ENAMETOOLONG;
+	}
+
+	if(name_length > MAX_NAME_LENGTH){
+		printf("Cannot create directory\n");
+		printf("The length of filename exceeded the limit: %ld > %d \n", name_length, MAX_NAME_LENGTH); 
+		return -ENAMETOOLONG;
+	}
+
+    return 0;
+}
+
+// Returns the index of the first inactive node in the filesystem
+// Returns -1 if every node is active
+// fs -> filesystem
+int find_inactive_index(const Inode fs[], const int fs_max_size, const char *path) {
+	for(int i = 0; i < fs_max_size; i++){
+		if(!fs[i].is_active){
             return i;
         }
     }
