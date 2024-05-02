@@ -1,13 +1,13 @@
-char *extract_name_from_abs(const char *buf){
-    const char *last_slash = strrchr(buf, '/'); 
+char *extract_name_from_abs(const char *path){
+    const char *last_slash = strrchr(path, '/'); 
     if (last_slash == NULL)
         return NULL;
 
     return strdup(last_slash + 1);
 }
 
-char *extract_path_from_abs(const char *buf) {
-    const char *last_slash = strrchr(buf, '/');
+char *extract_path_from_abs(const char *path) {
+    const char *last_slash = strrchr(path, '/');
 
     if (last_slash == NULL) {
         return NULL;
@@ -15,7 +15,7 @@ char *extract_path_from_abs(const char *buf) {
         return strdup("/");
     }
 
-    size_t dir_len = last_slash - buf + 1;
+    size_t dir_len = last_slash - path + 1;
 
     if(dir_len != 1){
         dir_len--;
@@ -26,7 +26,7 @@ char *extract_path_from_abs(const char *buf) {
         return NULL;
     }
 
-    strncpy(dir_path, buf, dir_len);
+    strncpy(dir_path, path, dir_len);
     dir_path[dir_len + 1] = '\0'; // Null-terminate the string
 
     return dir_path;
@@ -48,7 +48,7 @@ int find_active_path_index(const Inode fs[], const int fs_max_size, const char *
 // Handle error cases for the creation of an inode
 int handle_inode_creation(const Inode fs[], const int fs_max_size, const char *path, const int inode_count) {
     // Check if the path already exists
-	if(find_active_path_index(filesystem, fs_max_size, path) >= 0) 
+	if(find_active_path_index(fs, fs_max_size, path) >= 0) 
 		return -EEXIST;
 	
 	// Check if the number of inodes is not exceeded

@@ -97,11 +97,9 @@ int dm510fs_readdir( const char *path, void *buf, fuse_fill_dir_t filler, off_t 
 		if(filesystem[i].is_active){
 			char *real_path = extract_path_from_abs(filesystem[i].path);
 			printf("real_path: %s\n", real_path);
-			if(strcmp(path, real_path) == 0){
-				// if(strlen(filesystem[i].name) != 0){ // TODO: Why is this checked?
+			// Check if it is in the same directory path, but not being the same
+			if(strcmp(path, real_path) == 0 && strcmp(filesystem[i].path, path) != 0)
 				filler(buf, filesystem[i].name, NULL, 0);
-				//}		
-			}
 		}
 	}
 
@@ -120,7 +118,7 @@ int dm510fs_open( const char *path, struct fuse_file_info *fi ) {
 	// TODO: Check for the owner or group of the person calling it and put an error if it does not have permission
 	int index = find_active_path_index(filesystem, MAX_INODES, path);
 	if(index < 0) return -ENOENT;
-		
+	
 	return 0;
 }
 
