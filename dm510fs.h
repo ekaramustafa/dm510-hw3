@@ -8,7 +8,7 @@
 #include <time.h>
 
 #define MAX_DATA_IN_FILE 256
-#define MAX_PATH_LENGTH 128
+#define MAX_PATH_LENGTH 256
 #define MAX_NAME_LENGTH 64
 #define MAX_INODES 16
 #define PERSISENT_FILENAME "filesystem.dat"
@@ -36,7 +36,6 @@ int dm510fs_open( const char *, struct fuse_file_info * );
 int dm510fs_read( const char *, char *, size_t, off_t, struct fuse_file_info * );
 int dm510fs_mkdir(const char *path, mode_t mode);
 int dm510fs_mknod(const char *path, mode_t mode, dev_t devno);
-int dm510fs_rename(const char *path, const char *new_path);
 int dm510fs_utime(const char * path, struct utimbuf *ubuf);
 int dm510fs_release(const char *path, struct fuse_file_info *fi);
 int dm510fs_rmdir(const char *path);
