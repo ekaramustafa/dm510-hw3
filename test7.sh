@@ -1,56 +1,72 @@
+#!/bin/bash
+
+# Test 7: Test that inserting the maximum number of inodes in the filesystem.
+# Check if trying to insert one above the max gives an error 
+
 # Define colors
 GREEN='\e[32m'
 RED='\e[31m'
 RESET_COLOR='\e[0m'
 YELLOW='\e[33m'
+MAGENTA='\e[35m'
 
-rm -rf * #remove the directory for the test4 
-mkdir -p file1/file2
-mkdir -p file1/file2/file3
-mkdir -p file1/file4
-touch file1/alp.txt
-mv file1 file128
-ls_output=$(ls)
-expected_string="file128"
+cd ~/dm510fs-mountpoint/
+# Clear current directory
+clear_ls=$(ls)
+rm -rf * 
+clear_ls=$(ls)
+expected_ls_result="file1
+file10
+file11
+file12
+file13
+file14
+file15
+file2
+file3
+file4
+file5
+file6
+file7
+file8
+file9" 
 
+# Create files
+for i in {1..15}
+do
+   touch "file$i"
+done
 
 echo "==================================================="
-echo "Test 7 rename Test Part-1" 
+echo "Test 7: max inodes test" 
+echo "Created 15 files"
 echo "Executing ls command"
-echo "The output"
+echo "The ls output"
 echo -e "${YELLOW}$(ls)${RESET_COLOR}\n"
-echo "Expected output"
-echo -e "${YELLOW}$expected_string${RESET_COLOR}"
+echo "Expected ls output"
+echo -e "${YELLOW}$expected_ls_result${RESET_COLOR}"
 
-
-if [ "$(ls)" = "$expected_string" ]; then
-    echo -e "${GREEN}Test 7 Part 1 Success${RESET_COLOR}"
+# Compare ls output with the expected string
+if [ "$(ls)" = "$expected_ls_result" ]; then
+    echo -e "${GREEN}Test 7 ls Success${RESET_COLOR}"
 else
-    echo -e "${RED}Test 7 Part 1 Fail${RESET_COLOR}"
+    echo -e "${RED}Test 7 ls Fail${RESET_COLOR}"
 fi
 
+expected_touch_result="touch: cannot touch 'file16': No space left on device"
+create_output=$(touch file16 2>&1)
 echo
-echo "==================="
-echo
+echo "Trying to insert another inode with touch command"
+echo "The touch output"
+echo -e "${YELLOW}$create_output${RESET_COLOR}\n"
+echo "Expected touch output"
+echo -e "${YELLOW}$expected_touch_result${RESET_COLOR}"
 
-cd file128
-ls_output2=$(ls)
-expected_string2="alp.txt
-file2
-file4"
-
-echo "Test 7 rename Test Part-2" 
-echo "Executing cd and ls command for child dirs"
-echo "The output"
-echo -e "${YELLOW}$ls_output2${RESET_COLOR}\n"
-echo "Expected output"
-echo -e "${YELLOW}$expected_string2${RESET_COLOR}"
-
-
-if [ "$ls_output2" = "$expected_string2" ]; then
-    echo -e "${GREEN}Test 7 Part 2 Success${RESET_COLOR}"
+# Compare ls output with the expected string
+if [ "$create_output" = "$expected_touch_result" ]; then
+    echo -e "${GREEN}Test 7 touch Success${RESET_COLOR}"
 else
-    echo -e "${RED}Test 7 Part 2 Fail${RESET_COLOR}"
+    echo -e "${RED}Test 7 touch Fail${RESET_COLOR}"
 fi
 echo "==================================================="
 echo

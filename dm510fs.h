@@ -8,8 +8,8 @@
 #include <time.h>
 
 #define MAX_DATA_IN_FILE 256
-#define MAX_PATH_LENGTH 256
-#define MAX_NAME_LENGTH 256
+#define MAX_PATH_LENGTH 128
+#define MAX_NAME_LENGTH 64
 #define MAX_INODES 16
 #define PERSISENT_FILENAME "filesystem.dat"
 
@@ -24,8 +24,8 @@ typedef struct Inode
     nlink_t nlink;
     off_t size;
     dev_t devno;
-    time_t access_time; // access time
-    time_t modif_time; // modification time
+    time_t access_time;
+    time_t modif_time;
     uid_t owner;
     gid_t group;
 } Inode;

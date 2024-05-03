@@ -20,7 +20,7 @@ static struct fuse_operations dm510fs_oper = {
 	.read = dm510fs_read,
 	.release = dm510fs_release,
 	.write = dm510fs_write,
-	.rename = NULL,  // dm510fs_rename,
+	.rename = dm510fs_rename,
 	.utime = dm510fs_utime,
 	.init = dm510fs_init,
 	.destroy = dm510fs_destroy
@@ -37,13 +37,6 @@ int dm510fs_getattr( const char *path, struct stat *stbuf ) {
 	printf("getattr: (path=%s)\n", path);
 
 	memset(stbuf, 0, sizeof(struct stat));
-
-	if (strcmp(path, "/") == 0) {
-        stbuf->st_mode = S_IFDIR | 0755;
-        stbuf->st_nlink = 2;
-        return 0;
-    }
-
 	int index = find_active_path_index(filesystem, MAX_INODES, path);
 	if(index < 0) return -ENOENT;
 
@@ -170,7 +163,7 @@ int dm510fs_mknod(const char *path, mode_t mode, dev_t devno){
 	inode->is_dir = false;
 	inode->mode = mode;
 	inode->nlink = 1;
-	inode->devno = devno; //device number by makedev
+	inode->devno = devno; // Device number by makedev
 	inode->size = 0;
 	inode->group = getgid();
 	inode->owner = getuid();
@@ -186,53 +179,54 @@ int dm510fs_mknod(const char *path, mode_t mode, dev_t devno){
 }
 
 //TO-DO memory leaks and error handling
-/* int dm510fs_rename(const char *path, const char *new_path) {
+int dm510fs_rename(const char *path, const char *new_path) {
     printf("rename : (path=%s)\n", path);
+
     int count = 0;
     for (int i = 0; i < MAX_INODES; i++) {
-        if (filesystem[i].is_active) {
-            bool is_subfolder = strlen(filesystem[i].path) > strlen(path);
-            if (strncmp(filesystem[i].path, path, strlen(path)) == 0) {
-                char *new_name = extract_name_from_abs(new_path);
-                char *prev_name = extract_name_from_abs(path);
-                if (!is_subfolder) {
-                    strcpy(filesystem[i].name, new_name); // Use strcpy to copy the string
-					strcpy(filesystem[i].path, new_path); // Use strcpy to copy the string
-                } else {
-                    char result[strlen(filesystem[i].path) - strlen(prev_name) + strlen(new_name) + 1]; // Include space for '\0'
-                    int insertIndex = 0;
-                    const char delimiters[] = "/";
-                    strcpy(result, "/"); // Start with a leading '/'
-                    insertIndex++;
-                    char *token = strtok(filesystem[i].path, delimiters); // Initialize strtok with filesystem[i].path
-                    while (token != NULL) {
-                        if (strcmp(token, prev_name) == 0) { // Compare token with prev_name
-                            strcat(result, new_name); // Add new_name to result
-                            insertIndex += strlen(new_name); 
-                        } else {
-                            strcat(result, token); // Add token to result
-                            insertIndex += strlen(token); // Update insertIndex
-                        }
-                        token = strtok(NULL, delimiters);
-                        if (token != NULL) {
-                            strcat(result, "/"); // Add '/' if token is not NULL
-                            insertIndex++;
-                        }
-                    }
-                    strcpy(filesystem[i].path, result); // Update filesystem[i].path with the new path
-					free(token);
-                }
-                count++;
-				free(new_name);
-				free(prev_name);
-            }
+        if (filesystem[i].is_active && strncmp(filesystem[i].path, path, strlen(path)) == 0) {
+
+			bool is_subfolder = strlen(filesystem[i].path) > strlen(path);
+			char *new_name = extract_name_from_abs(new_path);
+			char *prev_name = extract_name_from_abs(path);
+			if (!is_subfolder) {
+				strcpy(filesystem[i].name, new_name);
+				strcpy(filesystem[i].path, new_path);
+			} else {
+				char result[strlen(filesystem[i].path) - strlen(prev_name) + strlen(new_name) + 1]; // Include space for '\0'
+				int insertIndex = 0;
+				const char delimiters[] = "/";
+				strcpy(result, "/"); // Start with a leading '/'
+				insertIndex++;
+				char *token = strtok(filesystem[i].path, delimiters); // Initialize strtok with filesystem[i].path
+				while (token != NULL) {
+					if (strcmp(token, prev_name) == 0) { // Compare token with prev_name
+						strcat(result, new_name); // Add new_name to result
+						insertIndex += strlen(new_name); 
+					} else {
+						strcat(result, token); // Add token to result
+						insertIndex += strlen(token); // Update insertIndex
+					}
+					token = strtok(NULL, delimiters);
+					if (token != NULL) {
+						strcat(result, "/"); // Add '/' if token is not NULL
+						insertIndex++;
+					}
+				}
+				strcpy(filesystem[i].path, result); // Update filesystem[i].path with the new path
+				free(token);
+			}
+			count++;
+			free(new_name);
+			free(prev_name);
+
         }
     }
     if (count > 0) {
         return 0;
     }
     return -ENOENT;
-} */
+}
 
 int dm510fs_utime(const char * path, struct utimbuf *ubuf){
 	printf("utime: (path=%s)\n",path);
@@ -262,7 +256,7 @@ int dm510fs_rmdir(const char *path) {
 	int count = 0;
 
     for (int i = 0; i < MAX_INODES; i++) {
-		// To check for inodes inside of the directory use strncmp
+		// Check for inodes inside of the directory using strncmp
 		bool path_in_directory = strncmp(filesystem[i].path, path, strlen(path)) == 0;
         if (filesystem[i].is_active && path_in_directory) {
             filesystem[i].is_active = false;

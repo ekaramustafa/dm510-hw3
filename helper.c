@@ -53,23 +53,24 @@ int handle_inode_creation(const Inode fs[], const int fs_max_size, const char *p
 	
 	// Check if the number of inodes is not exceeded
 	if(inode_count >= fs_max_size){
-		printf("Cannot create directory\n");
+		printf("Cannot create inode\n");
 		printf("The limit for number of files reached : %d == %d\n", inode_count, fs_max_size);
 		return -ENOSPC;
 	}
 
-	size_t path_length = strlen(path);
-	size_t name_length = strlen(extract_name_from_abs(path));
-	
-	if(path_length > MAX_PATH_LENGTH){
-		printf("Cannot create directory\n");
-		printf("The length of path exceeded the limit: %ld > %d \n", path_length, MAX_PATH_LENGTH); 
+    // Takes into account the null terminating character
+	size_t path_length = strlen(path) + 1;
+	size_t name_length = strlen(extract_name_from_abs(path)) + 1;
+
+	if(name_length > MAX_NAME_LENGTH){
+		printf("Cannot create inode\n");
+		printf("The length of filename exceeded the limit: %ld > %d \n", name_length, MAX_NAME_LENGTH); 
 		return -ENAMETOOLONG;
 	}
 
-	if(name_length > MAX_NAME_LENGTH){
-		printf("Cannot create directory\n");
-		printf("The length of filename exceeded the limit: %ld > %d \n", name_length, MAX_NAME_LENGTH); 
+	if(path_length > MAX_PATH_LENGTH){
+		printf("Cannot create inode\n");
+		printf("The length of path exceeded the limit: %ld > %d \n", path_length, MAX_PATH_LENGTH); 
 		return -ENAMETOOLONG;
 	}
 
@@ -96,6 +97,8 @@ void create_root_inode(Inode fs[]){
 	fs[0].mode = S_IFDIR | 0755;
 	fs[0].nlink = 2;
     fs[0].access_time = time(NULL);
+    fs[0].modif_time = time(NULL);
+    fs[0].size = 4096;
 	memcpy(fs[0].path, "/", 2);
 }
 

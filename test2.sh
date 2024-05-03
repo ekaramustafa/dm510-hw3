@@ -9,14 +9,16 @@ RESET_COLOR='\e[0m'
 YELLOW='\e[33m'
 MAGENTA='\e[35m'
 
-rm -rf * #remove the directory for the test2
-expected_string="file.txt" 
-
+cd ~/dm510fs-mountpoint/
+# Clear current directory
+rm -rf * 
+# Create file
 touch file.txt
+expected_string="file.txt" 
 ls_output=$(ls)
 
 echo "==================================================="
-echo "Test 2 touch Test" 
+echo "Test 2: touch test" 
 echo "Executing touch file.txt command"
 echo -e "The output: ${YELLOW}$ls_output${RESET_COLOR}"
 echo -e "Expected output: ${YELLOW}$expected_string${RESET_COLOR}"
