@@ -15,6 +15,15 @@
 #define MAX_INODES 16
 #define PERSISENT_FILENAME "filesystem.dat"
 
+#define MAX_DATA_IN_BLOCK 256
+#define MAX_BLOCKS 16
+#define DIRECT_POINTERS 12
+
+typedef struct DataBlock{
+    char data[MAX_DATA_IN_BLOCK];
+    bool is_active;
+} DataBlock;
+
 //Thread variables
 extern pthread_t save_thread;
 extern int save_interval;
@@ -37,6 +46,7 @@ typedef struct Inode
     time_t modif_time;
     uid_t owner;
     gid_t group;
+    int direct_pointers[DIRECT_POINTERS];
 } Inode;
 
 int dm510fs_getattr( const char *, struct stat * );
