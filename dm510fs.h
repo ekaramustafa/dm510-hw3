@@ -6,12 +6,21 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include <time.h>
+#include <pthread.h>
+
 
 #define MAX_DATA_IN_FILE 256
 #define MAX_PATH_LENGTH 256
 #define MAX_NAME_LENGTH 64
 #define MAX_INODES 16
 #define PERSISENT_FILENAME "filesystem.dat"
+
+//Thread variables
+extern pthread_t save_thread;
+extern int save_interval;
+extern int running;
+
+void* periodic_save();
 
 typedef struct Inode
 {

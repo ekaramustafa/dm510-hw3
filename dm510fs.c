@@ -4,6 +4,10 @@
 Inode filesystem[MAX_INODES];
 int inode_count; // To track how many inodes are in the filesystem
 
+pthread_t save_thread;
+int save_interval = 5; //save the filesystems every 5 seconds
+int running = 1;
+
 /*
  * See descriptions in fuse source code usually located in /usr/include/fuse/fuse.h
  * Notice: The version on Github is a newer version than installed at IMADA
@@ -301,7 +305,12 @@ int dm510fs_release(const char *path, struct fuse_file_info *fi) {
 void* dm510fs_init() {
     printf("init filesystem\n");
 	inode_count = restore_filesystem(PERSISENT_FILENAME, filesystem, MAX_INODES);
-
+	
+	// Start the periodic save thread
+    if (pthread_create(&save_thread, NULL, periodic_save, NULL) != 0) {
+        perror("Failed to create save thread");
+        exit(EXIT_FAILURE);
+    }
     return NULL;
 }
 
@@ -310,9 +319,20 @@ void* dm510fs_init() {
  * Called on filesystem exit.
  */
 void dm510fs_destroy(void *private_data) {
+	running = 0;
+    pthread_join(save_thread, NULL);
+
 	save_filesystem(PERSISENT_FILENAME, filesystem, MAX_INODES);
 }
 
+void* periodic_save() {
+    while (running) {
+        sleep(save_interval);
+        save_filesystem(PERSISENT_FILENAME, filesystem, MAX_INODES);
+		printf("the filesystem periodic save completed.\n");
+    }
+    return NULL;
+}
 int main( int argc, char *argv[] ) {
 	fuse_main( argc, argv, &dm510fs_oper );
 
