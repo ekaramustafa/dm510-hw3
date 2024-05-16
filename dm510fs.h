@@ -8,16 +8,17 @@
 #include <time.h>
 #include <pthread.h>
 
-
 #define MAX_DATA_IN_FILE 256
 #define MAX_PATH_LENGTH 256
 #define MAX_NAME_LENGTH 64
 #define MAX_INODES 16
+#define BLOCK_SIZE 4096
+#define NUM_BLOCKS 1000
 #define PERSISENT_FILENAME "filesystem.dat"
 
 //Thread variables
 extern pthread_t save_thread;
-extern int save_interval;
+extern int save_interval; // in seconds
 extern int running;
 
 void* periodic_save();
@@ -38,6 +39,12 @@ typedef struct Inode
     uid_t owner;
     gid_t group;
 } Inode;
+
+typedef struct filesystem
+{
+    Inode files[MAX_INODES];
+    char data_blocks[NUM_BLOCKS][BLOCK_SIZE];
+} filesystem;
 
 int dm510fs_getattr( const char *, struct stat * );
 int dm510fs_readdir( const char *, void *, fuse_fill_dir_t, off_t, struct fuse_file_info * );

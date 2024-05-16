@@ -34,10 +34,9 @@ char *extract_path_from_abs(const char *path) {
 
 // Returns the index of the found path in the filesystem provided if this is active
 // Returns -1 if the file was not found or if it is not active (deleted)
-// fs -> filesystem
-int find_active_path_index(const Inode fs[], const int fs_max_size, const char *path) {
-	for(int i = 0; i < fs_max_size; i++){
-		if(fs[i].is_active && strcmp(fs[i].path, path) == 0){
+int find_active_path_index(const Inode files[], const int max_files_count, const char *path) {
+	for(int i = 0; i < max_files_count; i++){
+		if(files[i].is_active && strcmp(files[i].path, path) == 0){
             return i;
         }
     }
@@ -46,15 +45,15 @@ int find_active_path_index(const Inode fs[], const int fs_max_size, const char *
 }
 
 // Handle error cases for the creation of an inode
-int handle_inode_creation(const Inode fs[], const int fs_max_size, const char *path, const int inode_count) {
+int handle_inode_creation(const Inode files[], const int max_files_count, const char *path, const int inode_count) {
     // Check if the path already exists
-	if(find_active_path_index(fs, fs_max_size, path) >= 0) 
+	if(find_active_path_index(files, max_files_count, path) >= 0) 
 		return -EEXIST;
 	
 	// Check if the number of inodes is not exceeded
-	if(inode_count >= fs_max_size){
+	if(inode_count >= max_files_count){
 		printf("Cannot create inode\n");
-		printf("The limit for number of files reached : %d == %d\n", inode_count, fs_max_size);
+		printf("The limit for number of files reached : %d == %d\n", inode_count, max_files_count);
 		return -ENOSPC;
 	}
 
@@ -79,10 +78,9 @@ int handle_inode_creation(const Inode fs[], const int fs_max_size, const char *p
 
 // Returns the index of the first inactive node in the filesystem
 // Returns -1 if every node is active
-// fs -> filesystem
-int find_inactive_index(const Inode fs[], const int fs_max_size, const char *path) {
-	for(int i = 0; i < fs_max_size; i++){
-		if(!fs[i].is_active){
+int find_inactive_index(const Inode files[], const int max_files_count, const char *path) {
+	for(int i = 0; i < max_files_count; i++){
+		if(!files[i].is_active){
             return i;
         }
     }
@@ -91,27 +89,26 @@ int find_inactive_index(const Inode fs[], const int fs_max_size, const char *pat
 }
 
 // Create the root inode for the filesystem
-void create_root_inode(Inode fs[]){
-	fs[0].is_active = true;
-	fs[0].is_dir = true;
-	fs[0].mode = S_IFDIR | 0755;
-	fs[0].nlink = 2;
-    fs[0].access_time = time(NULL);
-    fs[0].modif_time = time(NULL);
-    fs[0].size = 4096;
-	memcpy(fs[0].path, "/", 2);
+void create_root_inode(Inode files[]){
+	files[0].is_active = true;
+	files[0].is_dir = true;
+	files[0].mode = S_IFDIR | 0755;
+	files[0].nlink = 2;
+    files[0].access_time = time(NULL);
+    files[0].modif_time = time(NULL);
+    files[0].size = 4096;
+	memcpy(files[0].path, "/", 2);
 }
 
 // Restore the filesystem from a .dat file created from outside
 // Returns the number of inodes in the filesystem, -1 if error occurred
-// fs -> filesystem
-int restore_filesystem(const char *filename, Inode fs[], const int fs_max_size) {
+int restore_filesystem(const char *filename, Inode files[], const int max_files_count) {
     // Clear the existing filesystem
-    memset(fs, 0, fs_max_size * sizeof(Inode));
+    memset(files, 0, max_files_count * sizeof(Inode));
 
     //Check if the file doesn't exist
     if (access(filename, F_OK) != 0) {
-        create_root_inode(fs);
+        create_root_inode(files);
         printf("Creating filesystem file...\n");
         // Create filesystem file
         FILE *file = fopen(filename, "w");
@@ -135,8 +132,8 @@ int restore_filesystem(const char *filename, Inode fs[], const int fs_max_size) 
     int inode_count = 0;
     while(fread(&temp, sizeof(Inode), 1, file) == 1) {
         next_file_index++;
-        if(next_file_index < fs_max_size) {
-            fs[next_file_index] = temp;
+        if(next_file_index < max_files_count) {
+            files[next_file_index] = temp;
             inode_count++;
         } else {
             printf("Max number of inodes reached.\n");
@@ -148,7 +145,7 @@ int restore_filesystem(const char *filename, Inode fs[], const int fs_max_size) 
     return inode_count;
 }
 
-void save_filesystem(const char *filename, Inode fs[], const int fs_max_size) {
+void save_filesystem(const char *filename, Inode files[], const int max_files_count) {
     //Check if the file doesn't exist
     if (access(filename, F_OK) != 0) {
         printf("Filesystem file does not exist.\n");
@@ -162,9 +159,9 @@ void save_filesystem(const char *filename, Inode fs[], const int fs_max_size) {
     }
 
     // Write each active inode to the file
-    for (int i = 0; i < fs_max_size; i++) {
-        if (fs[i].is_active) {
-            fwrite(&fs[i], sizeof(Inode), 1, file);
+    for (int i = 0; i < max_files_count; i++) {
+        if (files[i].is_active) {
+            fwrite(&files[i], sizeof(Inode), 1, file);
         }
     }
 
