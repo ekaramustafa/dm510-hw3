@@ -8,6 +8,8 @@ pthread_t save_thread;
 int save_interval = 5; //save the filesystems every 5 seconds
 int running = 1;
 
+DataBlock data_blocks[MAX_BLOCKS];
+
 /*
  * See descriptions in fuse source code usually located in /usr/include/fuse/fuse.h
  * Notice: The version on Github is a newer version than installed at IMADA
@@ -173,6 +175,9 @@ int dm510fs_mknod(const char *path, mode_t mode, dev_t devno){
 	inode->owner = getuid();
 	inode->access_time = time(NULL);
 	inode->modif_time = time(NULL);
+	for(int i =0;i<DIRECT_POINTERS;i++){
+		inode->direct_pointers[i] = -1;
+	}
 
 	char *name = extract_name_from_abs(path);
 	memcpy(inode->name, name, strlen(name) + 1);
@@ -201,6 +206,12 @@ int dm510fs_unlink(const char *path){
 	if(index < 0) return -ENOENT;
 
 	filesystem[index].is_active = false;
+	for(int j =0; j < DIRECT_POINTERS; j++){
+		if(filesystem[index].direct_pointers[j] != -1) {
+			deallocate_block(data_blocks, j);
+			filesystem[index].direct_pointers[j] = -1;
+		}
+	}
 	inode_count--;
 	return 0;
 }
@@ -216,6 +227,7 @@ int dm510fs_rmdir(const char *path) {
             filesystem[i].is_active = false;
 			count++;
 			inode_count--;
+			
         }
     }
 
@@ -240,6 +252,7 @@ int dm510fs_truncate(const char *path, off_t size){
 /* 
  * Write to a file in the filesystem if it is active and has space for the buffer and offset given
 */
+/*
 int dm510fs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info * filp){
 	printf("write: (path=%s), (size=%lu), (offset=%ld) \n", path, size, offset);
 	
@@ -259,11 +272,52 @@ int dm510fs_write(const char *path, const char *buf, size_t size, off_t offset, 
 	filesystem[index].modif_time = time(NULL); // Update modification time
 	return size;
 }
+*/
+int dm510fs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info * filp) {
+    printf("write: (path=%s), (size=%lu), (offset=%ld) \n", path, size, offset);
+
+    int index = find_active_path_index(filesystem, MAX_INODES, path);
+    if (index < 0) return -ENOENT;
+
+    Inode *inode = &filesystem[index];
+
+    size_t total_written = 0;
+    size_t to_write = size;
+    size_t block_offset = offset % MAX_DATA_IN_BLOCK;
+
+    while (to_write > 0) {
+        int block_index = offset / MAX_DATA_IN_BLOCK;
+        if (block_index < DIRECT_POINTERS) {
+            if (inode->direct_pointers[block_index] == -1) {
+                inode->direct_pointers[block_index] = allocate_block(data_blocks);
+                if (inode->direct_pointers[block_index] == -1) return -ENOSPC;
+            }
+
+            int block = inode->direct_pointers[block_index];
+            size_t write_size = (to_write < MAX_DATA_IN_BLOCK - block_offset) ? to_write : MAX_DATA_IN_BLOCK - block_offset;
+            memcpy(data_blocks[block].data + block_offset, buf + total_written, write_size);
+
+            to_write -= write_size;
+            total_written += write_size;
+            offset += write_size;
+            block_offset = 0;
+        } else {
+            return -EMSGSIZE;
+        }
+    }
+
+    inode->size = (inode->size < offset) ? offset : inode->size;
+    inode->modif_time = time(NULL);
+
+    return total_written;
+}
+
 
 /*
  * Read size bytes from the given file into the buffer buf, beginning offset bytes into the file. See read(2) for full details.
  * Returns the number of bytes transferred, or 0 if offset was at or beyond the end of the file. Required for any sensible filesystem.
 */
+/*
 int dm510fs_read( const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi ) {
 	printf("read: (path=%s), (size=%lu), (offset=%ld) \n", path, size, offset);
 
@@ -284,6 +338,43 @@ int dm510fs_read( const char *path, char *buf, size_t size, off_t offset, struct
 	filesystem[index].access_time = time(NULL); // Update access time
 	return filesystem[index].size;
 }
+*/
+int dm510fs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
+    printf("read: (path=%s), (size=%lu), (offset=%ld) \n", path, size, offset);
+
+    int index = find_active_path_index(filesystem, MAX_INODES, path);
+    if (index < 0) return -ENOENT;
+
+    Inode *inode = &filesystem[index];
+
+    if (offset >= inode->size) return 0;
+
+    size_t total_read = 0;
+    size_t to_read = size;
+    size_t block_offset = offset % MAX_DATA_IN_BLOCK;
+
+    while (to_read > 0 && offset < inode->size) {
+        int block_index = offset / MAX_DATA_IN_BLOCK;
+        if (block_index < DIRECT_POINTERS && inode->direct_pointers[block_index] != -1) {
+            int block = inode->direct_pointers[block_index];
+            size_t read_size = (to_read < MAX_DATA_IN_BLOCK - block_offset) ? to_read : MAX_DATA_IN_BLOCK - block_offset;
+            read_size = (read_size < inode->size - offset) ? read_size : inode->size - offset;
+            memcpy(buf + total_read, data_blocks[block].data + block_offset, read_size);
+
+            to_read -= read_size;
+            total_read += read_size;
+            offset += read_size;
+            block_offset = 0;
+        } else {
+            break;
+        }
+    }
+
+    inode->access_time = time(NULL);
+
+    return total_read;
+}
+
 
 /*
  * This is the only FUSE function that doesn't have a directly corresponding system call, although close(2) is related.
@@ -306,6 +397,9 @@ void* dm510fs_init() {
     printf("init filesystem\n");
 	inode_count = restore_filesystem(PERSISENT_FILENAME, filesystem, MAX_INODES);
 	
+	for (int i = 0; i < MAX_BLOCKS; i++) {
+        data_blocks[i].is_active = false;
+    }
 	// Start the periodic save thread
     if (pthread_create(&save_thread, NULL, periodic_save, NULL) != 0) {
         perror("Failed to create save thread");
@@ -319,9 +413,9 @@ void* dm510fs_init() {
  * Called on filesystem exit.
  */
 void dm510fs_destroy(void *private_data) {
+	printf("filesystem unmounted\n");
 	running = 0;
     pthread_join(save_thread, NULL);
-
 	save_filesystem(PERSISENT_FILENAME, filesystem, MAX_INODES);
 }
 
@@ -333,6 +427,8 @@ void* periodic_save() {
     }
     return NULL;
 }
+
+
 int main( int argc, char *argv[] ) {
 	fuse_main( argc, argv, &dm510fs_oper );
 

@@ -170,3 +170,20 @@ void save_filesystem(const char *filename, Inode fs[], const int fs_max_size) {
 
     fclose(file);
 }
+
+
+int allocate_block(DataBlock data_blocks[]) {
+    for (int i = 0; i < MAX_BLOCKS; i++) {
+        if (!data_blocks[i].is_active) {
+            data_blocks[i].is_active = true;
+            return i;
+        }
+    }
+    return -1; // No free blocks
+}
+
+void deallocate_block(DataBlock data_blocks[], int index) {
+    if (index >= 0 && index < MAX_BLOCKS) {
+        data_blocks[index].is_active = false;
+    }
+}
