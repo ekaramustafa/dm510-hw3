@@ -10,6 +10,7 @@ bash "$original_dir/test5.sh"
 bash "$original_dir/test6.sh"
 bash "$original_dir/test7.sh"
 bash "$original_dir/test8.sh"
+bash "$original_dir/test9.sh"
 
 cd ~/dm510fs-mountpoint/
 rm -rf * 
