@@ -57,6 +57,7 @@ int dm510fs_mkdir(const char *path, mode_t mode);
 int dm510fs_mknod(const char *path, mode_t mode, dev_t devno);
 int dm510fs_utime(const char * path, struct utimbuf *ubuf);
 int dm510fs_release(const char *path, struct fuse_file_info *fi);
+int dm510fs_rename(const char *path, const char *new_path);
 int dm510fs_rmdir(const char *path);
 int dm510fs_unlink(const char *path);
 int dm510fs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info * filp);
